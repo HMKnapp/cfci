@@ -1,0 +1,72 @@
+# Corporate Firewall Certificate Importer
+
+Self-signed corporate MITM certificates often stop you cold, especially when it comes to working with Docker or WSL or simply Git Bash if you're forced to use Windows.
+
+I made this drop-in script with the aim that it _just works_. You can immediately start productive work instead of trying to filter out bits of useful information from an ocean of outdated and irrelevant information provided by people who are just guessing.
+
+.E.g. you
+- are stuck when building a docker image, because the corporate firewall prevents you from installing packages or even querying the mirror list
+- cannot update your local git installation with ``git-update-git-for-windows``
+- cannot use repositories with https mirrors in WSL
+
+## What does *CFCI* do?
+
+*CFCI* connects to a list of hosts, downloads their certificate chain, splits them into individual certificates, and imports them into the system's certificate store.
+
+[qanda]
+Why several hosts?::
+Because experience tells me that the same firewall may inject different self-signed certificates for different hosts. The list contained in the script is a list of commonly used hosts which should cover most cases.
+
+What if my supercorp requires a proxy in addition to its firewall?::
+*CFCI* detects if a proxy is set via ``ENV`` and will fetch the proxy's certificates and import them.
+
+## Usage
+
+### On your local machine
+
+.Just run it
+[source,sh]
+----
+bash cfci.sh
+----
+
+.You can specify custom hosts if you need to
+[source,sh]
+----
+bash cfci.sh nexus.globocorp.local gitlab.globocorp.local
+----
+
+### Docker
+
+If your docker image builds fail because you get tortured with unsafe MITM pseudo-security nonsense, put *CFCI* in the beginning of your ``Dockerfile``.
+
+.Run *CFCI* before you connect anywhere
+[source,Dockerfile]
+----
+FROM rockylinux:9
+
+COPY cfci.sh /cfci.sh
+RUN bash /cfci.sh
+
+RUN yum update -y
+RUN yum upgrade -y
+----
+
+NOTE: If your security team is especially talented you may get an _unsafe legacy renegotiation_ error on some hosts. In this case you can use a modified ``openssl.cnf`` _before_ *CFCI* is called.
+
+.Add custom ``openssl.cnf`` for SSL legacy renegotiation
+[source,Dockerfile]
+----
+FROM rockylinux:9
+
+COPY openssl.cnf /etc/pki/tls/openssl.cnf
+COPY cfci.sh /cfci.sh
+RUN bash /cfci.sh
+----
+
+## Known to work with
+
+. Rocky Linux / RHEL / Fedora
+. Ubuntu (WSL)
+. Windows (MinGW)
+. Possibly many more
